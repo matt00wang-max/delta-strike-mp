@@ -98,7 +98,7 @@
   <div id="buffs"></div>
   <div id="ammo" class="panel">
     <div class="big"><span id="magVal">30</span> / <span id="resVal">120</span></div>
-    <div class="sml">AK-BRIGHT &nbsp; <kbd>R</kbd> reload &nbsp; <kbd>E</kbd> use</div>
+    <div class="sml"><span id="weaponName">AK-BRIGHT</span> &nbsp; <kbd>1-6</kbd> swap &nbsp; <kbd>R</kbd> reload &nbsp; <kbd>E</kbd> use</div>
   </div>
   <div id="obj" class="panel">
     <div class="title">MISSION TASKS</div>
@@ -117,6 +117,7 @@
     <h2 id="endSub">BRIGHT OPS — TACTICAL DROP</h2>
     <p><b>WASD</b> move &nbsp; <b>Mouse</b> look &nbsp; <b>Click</b> fire</p>
     <p><b>Shift</b> sprint &nbsp; <b>Ctrl/C</b> crouch &nbsp; <b>Space</b> jump &nbsp; <b>R</b> reload &nbsp; <b>E</b> interact</p>
+    <p><b>1</b> Pistol &nbsp; <b>2</b> AK-Bright &nbsp; <b>3</b> SMG &nbsp; <b>4</b> Shotgun &nbsp; <b>5</b> Sniper &nbsp; <b>6</b> Boomer &nbsp; (or scroll wheel)</p>
     <p><b>Tasks:</b> kill 12 hostiles, crack 3 vaults, grab valuables, rescue the hostage, hold the capture point, then EXTRACT through the cyan portal.</p>
     <p><b>Pickups:</b> green = HP+, white plus = MEDKIT (full heal), cyan roll = BANDAGE (heal over time), magenta diamond = SPEED, pink = armor, yellow = ammo.</p>
     <p style="color:#ffd84a;margin-top:12px">Click <b>DEPLOY</b>, then click the screen to lock the mouse.</p>
@@ -246,6 +247,72 @@ function topAt(x, z){
   return top;
 }
 
+// ---------- weapons ----------
+const WEAPONS = [
+  { name:'PISTOL',    damage:22,  headMult:2.5, fireRate:5,   magSize:12, startReserve:60,
+    reload:0.9, spread:0.005, pellets:1, recoil:0.008, tracer:0xffd84a,
+    bodyColor:0xff5577, barrelColor:0xffd84a, magColor:0x00e6ff,
+    barrelLen:0.32, bodyLen:0.40, bodyW:0.14, bodyH:0.14, hasMag:true },
+  { name:'AK-BRIGHT', damage:28, headMult:2.3, fireRate:11, magSize:30, startReserve:120,
+    reload:1.1, spread:0.012, pellets:1, recoil:0.012, tracer:0xffd84a,
+    bodyColor:0xff6cf3, barrelColor:0xffd84a, magColor:0x00e6ff,
+    barrelLen:0.55, bodyLen:0.85, bodyW:0.18, bodyH:0.18, hasMag:true },
+  { name:'SMG-NEON',  damage:14, headMult:2.0, fireRate:18, magSize:40, startReserve:160,
+    reload:1.0, spread:0.025, pellets:1, recoil:0.008, tracer:0xff8a3d,
+    bodyColor:0xb98cff, barrelColor:0x7cffb2, magColor:0xffd84a,
+    barrelLen:0.40, bodyLen:0.55, bodyW:0.16, bodyH:0.16, hasMag:true },
+  { name:'SHOTGUN',   damage:14, headMult:1.8, fireRate:1.5, magSize:6, startReserve:30,
+    reload:1.6, spread:0.08, pellets:8, recoil:0.04, tracer:0xff5577,
+    bodyColor:0xff8a3d, barrelColor:0xff5577, magColor:0xffffff,
+    barrelLen:0.70, bodyLen:0.70, bodyW:0.20, bodyH:0.20, hasMag:false },
+  { name:'SNIPER',    damage:110, headMult:1.5, fireRate:1.0, magSize:5, startReserve:25,
+    reload:1.8, spread:0.001, pellets:1, recoil:0.06, tracer:0x00e6ff,
+    bodyColor:0x00e6ff, barrelColor:0xffffff, magColor:0xff6cf3,
+    barrelLen:1.00, bodyLen:0.95, bodyW:0.16, bodyH:0.18, hasMag:true,
+    scope:true },
+  { name:'BOOMER',    damage:80, headMult:1.0, fireRate:0.8, magSize:1, startReserve:8,
+    reload:2.0, spread:0.005, pellets:1, recoil:0.08, tracer:0xffd84a,
+    bodyColor:0xffd84a, barrelColor:0xff5577, magColor:0x7cffb2,
+    barrelLen:0.50, bodyLen:0.95, bodyW:0.24, bodyH:0.24, hasMag:false,
+    explosive:true, explodeRadius:6 },
+];
+
+function buildWeaponMesh(w){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(w.bodyW, w.bodyH, w.bodyLen),
+    new THREE.MeshStandardMaterial({ color:w.bodyColor, metalness:0.6, roughness:0.3, emissive:w.bodyColor, emissiveIntensity:0.25 })
+  );
+  body.position.set(0.32, -0.28, -0.15 - w.bodyLen/2);
+  g.add(body);
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, w.barrelLen, 12),
+    new THREE.MeshStandardMaterial({ color:w.barrelColor, metalness:0.85, roughness:0.2 })
+  );
+  barrel.rotation.x = Math.PI/2;
+  barrel.position.set(0.32, -0.24, -0.15 - w.bodyLen - w.barrelLen/2);
+  g.add(barrel);
+  if (w.hasMag){
+    const mag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.22, 0.2),
+      new THREE.MeshStandardMaterial({ color:w.magColor, metalness:0.4, roughness:0.4 })
+    );
+    mag.position.set(0.32, -0.45, -0.15 - w.bodyLen/2);
+    g.add(mag);
+  }
+  if (w.scope){
+    const scope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.18, 12),
+      new THREE.MeshStandardMaterial({ color:0x222222, metalness:0.7, roughness:0.3 })
+    );
+    scope.rotation.x = Math.PI/2;
+    scope.position.set(0.32, -0.18, -0.15 - w.bodyLen*0.6);
+    g.add(scope);
+  }
+  for (const m of g.children) m.castShadow = true;
+  return g;
+}
+
 // ---------- player ----------
 const player = {
   pos: new THREE.Vector3(0, 0, 25),
@@ -254,7 +321,9 @@ const player = {
   height: PLAYER_H_STAND,
   onGround: true, crouch:false, sprint:false,
   hp: 100, armor: 50,
-  mag: 30, magMax: 30, reserve: 120, reloading: false, lastShot: 0,
+  currentWeapon: 1,
+  weaponAmmo: WEAPONS.map(w => ({ mag: w.magSize, reserve: w.startReserve })),
+  reloading: false, lastShot: 0,
   score: 0, cash: 0, alive:true,
   // buffs
   bandageUntil: 0, bandageNextTick: 0,
@@ -270,6 +339,30 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyR') reload();
 });
 addEventListener('keyup',   e => { keys[e.code] = false; });
+addEventListener('keydown', e => {
+  if      (e.code === 'Digit1') switchWeapon(0);
+  else if (e.code === 'Digit2') switchWeapon(1);
+  else if (e.code === 'Digit3') switchWeapon(2);
+  else if (e.code === 'Digit4') switchWeapon(3);
+  else if (e.code === 'Digit5') switchWeapon(4);
+  else if (e.code === 'Digit6') switchWeapon(5);
+});
+addEventListener('wheel', e => {
+  if (!pointerLocked) return;
+  let next = player.currentWeapon + (e.deltaY > 0 ? 1 : -1);
+  if (next < 0) next = WEAPONS.length - 1;
+  if (next >= WEAPONS.length) next = 0;
+  switchWeapon(next);
+});
+function switchWeapon(idx){
+  if (idx < 0 || idx >= WEAPONS.length) return;
+  if (idx === player.currentWeapon) return;
+  player.currentWeapon = idx;
+  player.reloading = false;
+  rebuildViewmodel();
+  showPickupToast(WEAPONS[idx].name, '#ffd84a');
+  updateHUD();
+}
 let pointerLocked = false;
 canvas.addEventListener('click', () => { if (player.alive) canvas.requestPointerLock(); });
 document.addEventListener('pointerlockchange', () => { pointerLocked = document.pointerLockElement === canvas; });
@@ -289,22 +382,12 @@ document.addEventListener('mouseup',   e => { if (e.button===0) firing = false; 
 const gunGroup = new THREE.Group();
 camera.add(gunGroup);
 scene.add(camera);
-const gunBody = new THREE.Mesh(
-  new THREE.BoxGeometry(0.18, 0.18, 0.85),
-  new THREE.MeshStandardMaterial({ color:0xff6cf3, metalness:0.6, roughness:0.3, emissive:0x441033, emissiveIntensity:0.4 })
-);
-gunBody.position.set(0.32, -0.28, -0.55); gunGroup.add(gunBody);
-const gunBarrel = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.045, 0.045, 0.55, 12),
-  new THREE.MeshStandardMaterial({ color:0xffd84a, metalness:0.85, roughness:0.2 })
-);
-gunBarrel.rotation.x = Math.PI/2;
-gunBarrel.position.set(0.32, -0.24, -0.95); gunGroup.add(gunBarrel);
-const gunMag = new THREE.Mesh(
-  new THREE.BoxGeometry(0.12, 0.22, 0.2),
-  new THREE.MeshStandardMaterial({ color:0x00e6ff, metalness:0.4, roughness:0.4 })
-);
-gunMag.position.set(0.32, -0.45, -0.5); gunGroup.add(gunMag);
+function rebuildViewmodel(){
+  while (gunGroup.children.length > 0) gunGroup.remove(gunGroup.children[0]);
+  const m = buildWeaponMesh(WEAPONS[player.currentWeapon]);
+  while (m.children.length > 0) gunGroup.add(m.children[0]);
+}
+rebuildViewmodel();
 const flash = new THREE.PointLight(0xfff0a0, 0, 8, 2);
 flash.position.set(0.32, -0.24, -1.25); camera.add(flash);
 const flashMesh = new THREE.Mesh(
@@ -554,51 +637,63 @@ function spawnTracer(from, dir, len, color = 0xffd84a){
 // ---------- shooting ----------
 function tryShoot(now){
   if (!player.alive) return;
+  const w = WEAPONS[player.currentWeapon];
+  const ammo = player.weaponAmmo[player.currentWeapon];
   if (player.reloading) return;
-  if (player.mag <= 0){ reload(); return; }
-  if (now - player.lastShot < 0.09) return;
+  if (ammo.mag <= 0){ reload(); return; }
+  if (now - player.lastShot < 1 / w.fireRate) return;
   player.lastShot = now;
-  player.mag--;
+  ammo.mag--;
 
-  const spread = (player.sprint ? 0.05 : 0.012) + (player.crouch ? -0.005 : 0);
-  const dir = new THREE.Vector3();
-  camera.getWorldDirection(dir);
-  dir.x += (Math.random()-0.5) * spread;
-  dir.y += (Math.random()-0.5) * spread;
-  dir.z += (Math.random()-0.5) * spread;
-  dir.normalize();
+  const baseSpread = w.spread + (player.sprint ? 0.04 : 0) + (player.crouch ? -0.003 : 0);
   const origin = camera.getWorldPosition(new THREE.Vector3());
+  const baseDir = new THREE.Vector3();
+  camera.getWorldDirection(baseDir);
 
-  const ray = new THREE.Raycaster(origin, dir, 0.3, 250);
-  const hits = ray.intersectObjects(scene.children, true);
-  let hitDist = 250, hitEnemy = null;
-  for (const h of hits){
-    if (h.object === ground || h.object === border) continue;
-    if (h.object === extraction.disc || h.object === extraction.beam) continue;
-    if (h.object === capturePoint.ring) continue;
-    let n = h.object, e = null;
-    while (n){
-      const found = enemies.find(en => en.obj === n);
-      if (found){ e = found; break; }
-      n = n.parent;
+  let hitsAny = false;
+  for (let p = 0; p < w.pellets; p++){
+    const dir = baseDir.clone();
+    dir.x += (Math.random()-0.5) * baseSpread;
+    dir.y += (Math.random()-0.5) * baseSpread;
+    dir.z += (Math.random()-0.5) * baseSpread;
+    dir.normalize();
+    const ray = new THREE.Raycaster(origin, dir, 0.3, 250);
+    const hits = ray.intersectObjects(scene.children, true);
+    let hitDist = 250, hitEnemy = null;
+    let hitPoint = origin.clone().add(dir.clone().multiplyScalar(250));
+    for (const h of hits){
+      if (h.object === ground || h.object === border) continue;
+      if (h.object === extraction.disc || h.object === extraction.beam) continue;
+      if (h.object === capturePoint.ring) continue;
+      let n = h.object, e = null;
+      while (n){
+        const found = enemies.find(en => en.obj === n);
+        if (found){ e = found; break; }
+        n = n.parent;
+      }
+      hitDist = h.distance;
+      hitPoint = h.point.clone();
+      if (e && e.alive){
+        hitEnemy = e;
+        const isHead = h.object === e.parts.head;
+        damageEnemy(e, isHead ? w.damage * w.headMult : w.damage);
+      }
+      break;
     }
-    hitDist = h.distance;
-    if (e && e.alive){
-      hitEnemy = e;
-      const isHead = h.object === e.parts.head;
-      damageEnemy(e, isHead ? 65 : 28);
+    spawnTracer(origin.clone().add(dir.clone().multiplyScalar(0.5)), dir, hitDist, w.tracer);
+    if (hitEnemy) hitsAny = true;
+    if (w.explosive){
+      explode(hitPoint, w.explodeRadius, w.damage);
     }
-    break;
   }
 
-  spawnTracer(origin.clone().add(dir.clone().multiplyScalar(0.5)), dir, hitDist);
-  flash.intensity = 4;
+  flash.intensity = w.pellets > 1 ? 6 : 4;
   flashMesh.material.opacity = 1;
   flashMesh.scale.setScalar(1 + Math.random()*0.6);
-  player.pitch += 0.012;
-  player.yaw   += (Math.random()-0.5) * 0.006;
+  player.pitch += w.recoil;
+  player.yaw   += (Math.random()-0.5) * w.recoil * 0.5;
 
-  if (hitEnemy){
+  if (hitsAny){
     const el = document.getElementById('hit');
     el.classList.add('on');
     setTimeout(()=>el.classList.remove('on'), 90);
@@ -630,18 +725,48 @@ function damageEnemy(e, dmg){
   }
 }
 
+function explode(pos, radius, baseDamage){
+  const s = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.5, 16, 12),
+    new THREE.MeshBasicMaterial({ color:0xffd84a, transparent:true, opacity:0.95 })
+  );
+  s.position.copy(pos);
+  scene.add(s);
+  const t0 = performance.now();
+  function anim(){
+    const dt = (performance.now() - t0) / 1000;
+    if (dt > 0.5){ scene.remove(s); s.geometry.dispose(); s.material.dispose(); return; }
+    s.scale.setScalar(1 + dt * 4);
+    s.material.opacity = 0.95 * (1 - dt * 2);
+    requestAnimationFrame(anim);
+  }
+  anim();
+  for (const e of enemies){
+    if (!e.alive) continue;
+    const d = e.pos.distanceTo(pos);
+    if (d < radius){
+      damageEnemy(e, baseDamage * (1 - d / radius));
+    }
+  }
+  const playerC = new THREE.Vector3(player.pos.x, player.pos.y + 1, player.pos.z);
+  const dp = playerC.distanceTo(pos);
+  if (dp < radius){ damagePlayer(baseDamage * 0.5 * (1 - dp / radius)); }
+}
+
 function reload(){
   if (player.reloading) return;
-  if (player.mag === player.magMax) return;
-  if (player.reserve <= 0) return;
+  const w = WEAPONS[player.currentWeapon];
+  const ammo = player.weaponAmmo[player.currentWeapon];
+  if (ammo.mag === w.magSize) return;
+  if (ammo.reserve <= 0) return;
   player.reloading = true;
   setTimeout(() => {
-    const need = player.magMax - player.mag;
-    const take = Math.min(need, player.reserve);
-    player.mag += take; player.reserve -= take;
+    const need = w.magSize - ammo.mag;
+    const take = Math.min(need, ammo.reserve);
+    ammo.mag += take; ammo.reserve -= take;
     player.reloading = false;
     updateHUD();
-  }, 1100);
+  }, w.reload * 1000);
 }
 
 // ---------- enemy AI ----------
@@ -790,7 +915,11 @@ function applyPickup(type){
     case 'bandage': player.bandageUntil = performance.now()/1000 + 5; break;
     case 'speed':   player.speedUntil   = performance.now()/1000 + 8; break;
     case 'armor':   player.armor = Math.min(100, player.armor + 35); break;
-    case 'ammo':    player.reserve += 60; break;
+    case 'ammo':
+      for (let i = 0; i < WEAPONS.length; i++){
+        player.weaponAmmo[i].reserve += Math.ceil(WEAPONS[i].magSize * 1.2);
+      }
+      break;
   }
   showPickupToast(def.label, '#'+def.color.toString(16).padStart(6,'0'));
 }
@@ -814,8 +943,12 @@ function updateHUD(){
   document.getElementById('enVal').textContent = enemies.filter(e=>e.alive).length;
   document.getElementById('scVal').textContent = player.score;
   document.getElementById('cashVal').textContent = '$' + player.cash;
-  document.getElementById('magVal').textContent = player.reloading ? '...' : player.mag;
-  document.getElementById('resVal').textContent = player.reserve;
+  const cw = WEAPONS[player.currentWeapon];
+  const ca = player.weaponAmmo[player.currentWeapon];
+  document.getElementById('magVal').textContent = player.reloading ? '...' : ca.mag;
+  document.getElementById('resVal').textContent = ca.reserve;
+  const wn = document.getElementById('weaponName');
+  if (wn) wn.textContent = cw.name;
   // task list
   const tl = document.getElementById('taskList');
   tl.innerHTML = '';
